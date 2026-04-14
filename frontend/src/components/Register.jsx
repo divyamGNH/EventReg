@@ -2,7 +2,7 @@ import { useState } from "react";
 import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
 
-function Register() {
+function Register({ setAuthUser }) {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -24,7 +24,8 @@ function Register() {
       );
 
       console.log(response.data);
-      navigate("/login");
+      setAuthUser(response.data?.user || null);
+      navigate("/home");
     } catch (error) {
       const message =
         error.response?.data?.message ||

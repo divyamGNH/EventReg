@@ -1,5 +1,9 @@
 import stripe from "../config/stripe.js";
-import User from "../models/User.js";
+import mongoose from "mongoose";
+import Event from "../models/Event.js";
+import EventRegistration from "../models/EventRegistration.js";
+import Payment from "../models/Payment.js";
+import WebhookEvent from "../models/WebhookEvent.js";
 
 export default async function webhookController(req, res) {
   const sig = req.headers["stripe-signature"];
@@ -17,129 +21,180 @@ export default async function webhookController(req, res) {
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  const findUserForEvent = async ({ userId, email, customerId }) => {
-    if (userId) {
-      const byId = await User.findById(userId);
-      if (byId) return byId;
-    }
+  const persistWebhookEvent = async () => {
+    try {
+      const existing = await WebhookEvent.findOne({ stripeEventId: event.id }).lean();
+      if (existing?.processed) {
+        return { alreadyProcessed: true };
+      }
 
-    if (customerId) {
-      const byCustomerId = await User.findOne({
-        "subscription.stripeCustomerId": customerId,
-      });
-      if (byCustomerId) return byCustomerId;
-    }
+      if (!existing) {
+        await WebhookEvent.create({
+          stripeEventId: event.id,
+          type: event.type,
+          processed: false,
+          payload: event,
+        });
+      }
 
-    if (email) {
-      const byEmail = await User.findOne({ email });
-      if (byEmail) return byEmail;
+      return { alreadyProcessed: false };
+    } catch (error) {
+      if (error?.code === 11000) {
+        return { alreadyProcessed: true };
+      }
+      throw error;
     }
-
-    return null;
   };
 
-  const markSubscriptionActive = async ({
-    user,
-    subscriptionId,
-    customerId,
-    currentPeriodEnd,
-  }) => {
-    user.subscription = {
-      ...user.subscription,
-      status: "active",
-      stripeCustomerId: customerId || user.subscription?.stripeCustomerId,
-      stripeSubscriptionId:
-        subscriptionId || user.subscription?.stripeSubscriptionId,
-      currentPeriodEnd:
-        currentPeriodEnd || user.subscription?.currentPeriodEnd || null,
-    };
+  const markWebhookComplete = async () => {
+    await WebhookEvent.updateOne(
+      { stripeEventId: event.id },
+      {
+        $set: {
+          processed: true,
+          processingError: "",
+        },
+      }
+    );
+  };
 
-    await user.save();
+  const markWebhookFailed = async (message) => {
+    await WebhookEvent.updateOne(
+      { stripeEventId: event.id },
+      {
+        $set: {
+          processed: false,
+          processingError: message || "Unknown webhook error",
+        },
+      }
+    );
+  };
+
+  const markPaymentAsCompleted = async (session) => {
+    const metadata = session.metadata || {};
+    const paymentRecordId = metadata.paymentRecordId;
+    const registrationId = metadata.registrationId;
+    const eventId = metadata.eventId;
+    const userId = metadata.userId;
+
+    if (!registrationId || !eventId || !userId) {
+      return;
+    }
+
+    if (
+      !mongoose.Types.ObjectId.isValid(registrationId) ||
+      !mongoose.Types.ObjectId.isValid(eventId) ||
+      !mongoose.Types.ObjectId.isValid(userId)
+    ) {
+      return;
+    }
+
+    const registration = await EventRegistration.findById(registrationId);
+    if (!registration) {
+      return;
+    }
+
+    let payment = null;
+
+    if (paymentRecordId && mongoose.Types.ObjectId.isValid(paymentRecordId)) {
+      payment = await Payment.findById(paymentRecordId);
+    }
+
+    if (!payment && session.id) {
+      payment = await Payment.findOne({ stripeCheckoutSessionId: session.id });
+    }
+
+    if (!payment) {
+      payment = await Payment.create({
+        userId,
+        eventId,
+        registrationId,
+        amountInCents: session.amount_total || 0,
+        currency: session.currency || "inr",
+        status: "pending",
+      });
+    }
+
+    payment.status = "paid";
+    payment.stripeCheckoutSessionId = session.id;
+    payment.stripePaymentIntentId = session.payment_intent || payment.stripePaymentIntentId;
+    payment.stripeCustomerId = session.customer || payment.stripeCustomerId;
+    await payment.save();
+
+    const wasAlreadyRegistered = registration.status === "registered";
+    registration.status = "registered";
+    registration.paidAt = registration.paidAt || new Date();
+    registration.paymentId = payment._id;
+    await registration.save();
+
+    if (!wasAlreadyRegistered) {
+      const updatedEvent = await Event.findOneAndUpdate(
+        {
+          _id: eventId,
+          status: "active",
+          $expr: {
+            $lt: ["$seatsBooked", "$capacity"],
+          },
+        },
+        { $inc: { seatsBooked: 1 } },
+        { new: true }
+      );
+
+      // If no seat was available at webhook time, keep the registration pending for manual review.
+      if (!updatedEvent) {
+        registration.status = "pending_payment";
+        await registration.save();
+      }
+    }
+  };
+
+  const markPaymentAsExpired = async (session) => {
+    const registrationId = session.metadata?.registrationId;
+    if (!registrationId || !mongoose.Types.ObjectId.isValid(registrationId)) {
+      return;
+    }
+
+    const payment = await Payment.findOne({ registrationId });
+    if (payment && payment.status !== "paid") {
+      payment.status = "expired";
+      await payment.save();
+    }
   };
 
   try {
+    const persistenceResult = await persistWebhookEvent();
+    if (persistenceResult.alreadyProcessed) {
+      return res.json({ received: true, duplicate: true });
+    }
+
     if (event.type === "checkout.session.completed") {
       const session = event.data.object;
-
-      if (session.mode === "subscription") {
-        const userId = session.metadata?.userId || session.client_reference_id;
-        const email =
-          session.metadata?.userEmail ||
-          session.customer_details?.email ||
-          session.customer_email;
-        const customerId = session.customer;
-        const subscriptionId = session.subscription;
-
-        const user = await findUserForEvent({ userId, email, customerId });
-
-        if (!user) {
-          console.log("User not found for checkout.session.completed", {
-            userId,
-            email,
-            customerId,
-          });
-          return res.json({ received: true });
-        }
-
-        await markSubscriptionActive({
-          user,
-          subscriptionId,
-          customerId,
-          currentPeriodEnd: null,
-        });
-
-        console.log("Subscription marked active on checkout for:", user.email);
+      if (session.mode === "payment" && session.payment_status === "paid") {
+        await markPaymentAsCompleted(session);
       }
     }
 
-    if (event.type === "invoice.payment_succeeded") {
-      const invoice = event.data.object;
-      const subscriptionId = invoice.subscription;
-
-      if (!subscriptionId) {
-        return res.json({ received: true });
+    if (event.type === "checkout.session.expired") {
+      const session = event.data.object;
+      if (session.mode === "payment") {
+        await markPaymentAsExpired(session);
       }
-
-      const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-      const customerId = subscription.customer;
-      const customer = await stripe.customers.retrieve(customerId);
-
-      const userId = subscription.metadata?.userId;
-      const email =
-        subscription.metadata?.userEmail ||
-        customer.email ||
-        invoice.customer_email;
-
-      const user = await findUserForEvent({ userId, email, customerId });
-
-      if (!user) {
-        console.log("User not found for invoice.payment_succeeded", {
-          userId,
-          email,
-          customerId,
-        });
-        return res.json({ received: true });
-      }
-
-      let currentPeriodEnd = null;
-
-      if (subscription.current_period_end) {
-        currentPeriodEnd = new Date(subscription.current_period_end * 1000);
-      }
-
-      await markSubscriptionActive({
-        user,
-        subscriptionId,
-        customerId,
-        currentPeriodEnd,
-      });
-
-      console.log("Subscription updated for:", user.email);
     }
 
-    res.json({ received: true });
+    if (event.type === "payment_intent.payment_failed") {
+      const paymentIntent = event.data.object;
+      await Payment.updateOne(
+        { stripePaymentIntentId: paymentIntent.id },
+        { $set: { status: "failed" } }
+      );
+    }
+
+    await markWebhookComplete();
+
+    return res.json({ received: true });
   } catch (err) {
     console.error("Webhook handler error:", err);
-    res.status(500).send("Server error");
+    await markWebhookFailed(err.message);
+    return res.status(500).send("Server error");
   }
 }

@@ -6,10 +6,12 @@ import cookieParser from "cookie-parser";
 import connectDB from "./db/db.js";
 import authRoutes from "./routes/userRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
-import webhookRoutes from "./routes/webhookRoutes.js"
-import lotteryRoutes from "./routes/lotteryRoutes.js";
+import webhookRoutes from "./routes/webhookRoutes.js";
+import eventRoutes from "./routes/eventRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
 
 import authMiddleware from "./middlewares/authMiddleware.js";
+import { requireAdmin } from "./middlewares/roleMiddleware.js";
 
 dotenv.config();
 connectDB();
@@ -18,7 +20,7 @@ const PORT = process.env.PORT || 3000;
 
 const app = express();
 
-app.use("/api/webhook",express.raw({ type: "application/json" }),webhookRoutes);
+app.use("/api/webhook", express.raw({ type: "application/json" }), webhookRoutes);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -30,9 +32,10 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use("/api/auth",authRoutes);
-app.use("/api/payments",authMiddleware,paymentRoutes);
-app.use("/api/lottery",authMiddleware,lotteryRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/events", authMiddleware, eventRoutes);
+app.use("/api/payments", authMiddleware, paymentRoutes);
+app.use("/api/admin", authMiddleware, requireAdmin, adminRoutes);
 // app.use("/",isAuthorized,);
 
 app.listen(PORT, () => {

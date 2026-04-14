@@ -1,13 +1,15 @@
-# Golf Internship Project
+# Event Registration Platform
 
-A full-stack golf app built during training.
+A full-stack event registration system with role-based access, Stripe payments, and webhook-driven database updates.
 
 This project includes:
 - user registration and login
-- role-based access (user/admin)
-- Stripe subscription checkout
-- score submission and tracking (latest 5 scores)
-- admin-triggered weighted lottery draw
+- admin and user dashboards
+- event creation and soft deletion (admin)
+- one-time event payment via Stripe Checkout
+- webhook-based payment confirmation and registration activation
+- user subscription/registration history
+- normalized MongoDB schema design for academic DBMS review
 
 ## Tech Stack
 
@@ -15,7 +17,6 @@ Frontend:
 - React (Vite)
 - React Router
 - Axios
-- TanStack Query
 - Tailwind CSS
 
 Backend:
@@ -34,11 +35,28 @@ Backend:
 
 1. User registers and logs in.
 2. Backend sets an HTTP-only cookie token.
-3. User can subscribe using Stripe Checkout.
-4. Stripe webhook updates subscription status in MongoDB.
-5. User submits golf scores.
-6. System stores only the latest 5 scores per user.
-7. Admin can run a weighted lottery from submitted scores.
+3. Admin creates events with capacity, schedule, and pricing.
+4. User starts event registration checkout.
+5. Stripe webhook confirms payment and marks registration as `registered`.
+6. Users can view their registrations and payments.
+7. Admin can view registered user IDs per event.
+
+## Data Model (6 Normalized Schemas)
+
+Collections:
+- `users`
+- `events`
+- `eventregistrations`
+- `payments`
+- `webhookevents`
+- `adminactionlogs`
+
+Design highlights:
+- one registration per `(userId, eventId)` pair (unique index)
+- one payment record per registration (unique index)
+- webhook idempotency via unique Stripe event ID
+- references instead of nested payment/event blobs
+- audit trail for admin actions
 
 ## API Overview
 
@@ -47,19 +65,24 @@ Auth routes:
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
 - `GET /api/auth/check`
-- `GET /api/auth/dashboard`
-- `GET /api/auth/admin`
 
 Payment routes:
-- `POST /api/payments/create-checkout-session`
+- `POST /api/payments/events/:eventId/checkout`
+
+User event routes:
+- `GET /api/events`
+- `GET /api/events/:eventId`
+- `GET /api/events/my-registrations`
+- `GET /api/events/my-payments`
+
+Admin routes:
+- `GET /api/admin/events`
+- `POST /api/admin/events`
+- `DELETE /api/admin/events/:eventId`
+- `GET /api/admin/events/:eventId/registrations`
 
 Webhook route:
 - `POST /api/webhook`
-
-Lottery routes:
-- `GET /api/lottery/scores`
-- `POST /api/lottery/submit-score`
-- `POST /api/lottery/draw-weighted`
 
 ## Environment Variables
 
@@ -69,11 +92,9 @@ Create `backend/.env` with values like:
 PORT=3000
 MONGO_URL=mongodb://127.0.0.1:27017/golf
 JWT_SECRET_KEY=your_jwt_secret
-STRIPE_PUBLISHABLE_KEY=your_publishable_key
 STRIPE_SECRET_KEY=your_secret_key
-SUCCESS_URL=http://localhost:5173/home
-PRICE_ID=your_price_id
 STRIPE_WEBHOOK_SECRET=your_webhook_secret
+FRONTEND_URL=http://localhost:5173
 ```
 
 ## Run Locally
@@ -105,5 +126,5 @@ Frontend runs on `http://localhost:5173` and backend runs on `http://localhost:3
 ## Notes
 
 - This is a training/internship project focused on full-stack concepts.
-- Lottery draw is weighted using score frequency logic in the backend.
 - Stripe webhook endpoint must be reachable by Stripe (use Stripe CLI in local development).
+- To create an admin account, register normally and update that user's `role` to `admin` in MongoDB.

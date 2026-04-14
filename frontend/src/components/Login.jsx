@@ -25,12 +25,7 @@ function Login({ setAuthUser }) {
       console.log(response.data);
       const loggedInUser = response.data?.user;
       setAuthUser(loggedInUser);
-
-      if (loggedInUser?.role === "admin") {
-        navigate("/admin");
-      } else {
-        navigate("/dashboard");
-      }
+      navigate("/home");
     } catch (error) {
       const message =
         error.response?.data?.message ||

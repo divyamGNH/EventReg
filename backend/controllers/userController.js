@@ -7,10 +7,32 @@ dotenv.config();
 
 const JWT_SECRET_KEY = process.env.JWT_SECRET_KEY;
 
+const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+const setAuthCookie = (res, token) => {
+  res.cookie("token", token, {
+    httpOnly: true,
+    secure: false,
+    sameSite: "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+};
+
 //Register route
 export const register = async (req, res) => {
   const { username, email, password } = req.body;
-  console.log(req.body);
+
+  if (!username || !email || !password) {
+    return res.status(400).json({ message: "username, email and password are required." });
+  }
+
+  if (!isValidEmail(email)) {
+    return res.status(400).json({ message: "Provide a valid email address." });
+  }
+
+  if (String(password).length < 8) {
+    return res.status(400).json({ message: "Password must be at least 8 characters long." });
+  }
 
   try {
     // Check if user already exists
@@ -25,15 +47,31 @@ export const register = async (req, res) => {
 
     // Create new user
     const newUser = new User({
-      username,
-      email,
+      username: String(username).trim(),
+      email: String(email).trim().toLowerCase(),
       password: hashedPassword,
       role: "user",
     });
     await newUser.save();
 
+    const token = jwt.sign(
+      { userId: newUser._id, role: newUser.role, email: newUser.email },
+      JWT_SECRET_KEY,
+      { expiresIn: "7d" }
+    );
+
+    setAuthCookie(res, token);
+
     console.log("User registered Succesfully");
-    res.status(201).json({ message: "User registered successfully." });
+    res.status(201).json({
+      message: "User registered successfully.",
+      user: {
+        userId: newUser._id,
+        username: newUser.username,
+        email: newUser.email,
+        role: newUser.role,
+      },
+    });
   } catch (error) {
     console.log("error registering", error);
     res
@@ -46,9 +84,13 @@ export const register = async (req, res) => {
 export const login = async (req, res) => {
   const { email, password } = req.body;
 
+  if (!email || !password) {
+    return res.status(400).json({ message: "email and password are required." });
+  }
+
   try {
     // Find user by email
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: String(email).trim().toLowerCase() }).select("+password username email role");
     if (!user) {
       return res
         .status(404)
@@ -66,11 +108,7 @@ export const login = async (req, res) => {
       { expiresIn: "7d" }
     );
 
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: false, // true in production (HTTPS)
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7days expiry
-    });
+    setAuthCookie(res, token);
 
     console.log("Logged in succesfully");
     res.status(200).json({
@@ -110,6 +148,7 @@ export const checkAuth = (req, res) => {
   try {
     res.status(200).json({ user: req.user });
   } catch (error) {
-    console.log("Error checking Auth : ",error);
+    console.log("Error checking Auth : ", error);
+    res.status(500).json({ message: "Error checking auth." });
   }
 };

@@ -20,17 +20,37 @@ const PORT = process.env.PORT || 3000;
 
 const app = express();
 
-app.use("/api/webhook", express.raw({ type: "application/json" }), webhookRoutes);
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  process.env.CORS_ORIGIN,
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  "http://localhost:5174",
+  "http://127.0.0.1:5174",
+].filter(Boolean);
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+};
+
+app.use(
+  "/api/webhook",
+  express.raw({ type: "application/json" }),
+  webhookRoutes,
+);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-app.use(cors({
-  origin: "http://localhost:5173",
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true,
-}));
+app.use(cors(corsOptions));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/events", authMiddleware, eventRoutes);
@@ -39,5 +59,5 @@ app.use("/api/admin", authMiddleware, requireAdmin, adminRoutes);
 // app.use("/",isAuthorized,);
 
 app.listen(PORT, () => {
-    console.log(`Server listening on PORT:${PORT}`);
+  console.log(`Server listening on PORT:${PORT}`);
 });

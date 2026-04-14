@@ -21,6 +21,18 @@ const eventSchema = new mongoose.Schema(
       maxlength: 180,
       default: "Online",
     },
+    category: {
+      type: String,
+      trim: true,
+      maxlength: 80,
+      default: "General",
+    },
+    imageUrl: {
+      type: String,
+      trim: true,
+      default: "",
+      maxlength: 2048,
+    },
     startDate: {
       type: Date,
       required: true,
@@ -66,7 +78,7 @@ const eventSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 eventSchema.index({ status: 1, startDate: 1 });

@@ -1,12 +1,14 @@
 import { useState } from "react";
 import axios from "axios";
 
-const API_BASE = "http://localhost:3000";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
 
 const initialEventForm = {
   title: "",
   description: "",
+  category: "General",
   location: "",
+  imageUrl: "",
   startDate: "",
   endDate: "",
   capacity: "",
@@ -55,7 +57,9 @@ export default function AdminEventsPanel({ events, onRefresh, onMessage }) {
     const payload = {
       title: formState.title,
       description: formState.description,
+      category: formState.category,
       location: formState.location,
+      imageUrl: formState.imageUrl,
       startDate: formState.startDate,
       endDate: formState.endDate,
       capacity: normalizedCapacity,
@@ -108,14 +112,16 @@ export default function AdminEventsPanel({ events, onRefresh, onMessage }) {
     try {
       const response = await axios.get(
         `${API_BASE}/api/admin/events/${eventId}/registrations`,
-        { withCredentials: true }
+        { withCredentials: true },
       );
       setRegistrationUsers(response.data?.users || []);
     } catch (error) {
       setRegistrationUsers([]);
       onMessage({
         type: "error",
-        message: error.response?.data?.message || "Failed to fetch event registrations.",
+        message:
+          error.response?.data?.message ||
+          "Failed to fetch event registrations.",
       });
     }
   };
@@ -125,17 +131,37 @@ export default function AdminEventsPanel({ events, onRefresh, onMessage }) {
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-xl font-semibold text-slate-900">Create Event</h2>
         <p className="mt-1 text-sm text-slate-600">
-          Enter the event details. Capacity means maximum people. Price is in rupees.
+          Enter event details including poster URL and category. Capacity means
+          max attendees.
         </p>
-        <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={handleCreateEvent}>
+        <form
+          className="mt-4 grid gap-3 md:grid-cols-2"
+          onSubmit={handleCreateEvent}
+        >
           <label className="space-y-1.5 text-sm text-slate-700">
             <span className="font-medium">Event Title</span>
             <input
               className="w-full rounded-xl border border-slate-300 px-3 py-2"
               placeholder="Example: Tech Fest 2026"
               value={formState.title}
-              onChange={(event) => setFormState((prev) => ({ ...prev, title: event.target.value }))}
+              onChange={(event) =>
+                setFormState((prev) => ({ ...prev, title: event.target.value }))
+              }
               required
+            />
+          </label>
+          <label className="space-y-1.5 text-sm text-slate-700">
+            <span className="font-medium">Category</span>
+            <input
+              className="w-full rounded-xl border border-slate-300 px-3 py-2"
+              placeholder="Example: Music"
+              value={formState.category}
+              onChange={(event) =>
+                setFormState((prev) => ({
+                  ...prev,
+                  category: event.target.value,
+                }))
+              }
             />
           </label>
           <label className="space-y-1.5 text-sm text-slate-700">
@@ -144,7 +170,26 @@ export default function AdminEventsPanel({ events, onRefresh, onMessage }) {
               className="w-full rounded-xl border border-slate-300 px-3 py-2"
               placeholder="Example: Main Auditorium"
               value={formState.location}
-              onChange={(event) => setFormState((prev) => ({ ...prev, location: event.target.value }))}
+              onChange={(event) =>
+                setFormState((prev) => ({
+                  ...prev,
+                  location: event.target.value,
+                }))
+              }
+            />
+          </label>
+          <label className="space-y-1.5 text-sm text-slate-700 md:col-span-2">
+            <span className="font-medium">Poster Image URL</span>
+            <input
+              className="w-full rounded-xl border border-slate-300 px-3 py-2"
+              placeholder="https://..."
+              value={formState.imageUrl}
+              onChange={(event) =>
+                setFormState((prev) => ({
+                  ...prev,
+                  imageUrl: event.target.value,
+                }))
+              }
             />
           </label>
           <label className="space-y-1.5 text-sm text-slate-700 md:col-span-2">
@@ -153,7 +198,12 @@ export default function AdminEventsPanel({ events, onRefresh, onMessage }) {
               className="w-full rounded-xl border border-slate-300 px-3 py-2"
               placeholder="Short description of the event"
               value={formState.description}
-              onChange={(event) => setFormState((prev) => ({ ...prev, description: event.target.value }))}
+              onChange={(event) =>
+                setFormState((prev) => ({
+                  ...prev,
+                  description: event.target.value,
+                }))
+              }
             />
           </label>
           <label className="space-y-1.5 text-sm text-slate-700">
@@ -162,7 +212,12 @@ export default function AdminEventsPanel({ events, onRefresh, onMessage }) {
               type="datetime-local"
               className="w-full rounded-xl border border-slate-300 px-3 py-2"
               value={formState.startDate}
-              onChange={(event) => setFormState((prev) => ({ ...prev, startDate: event.target.value }))}
+              onChange={(event) =>
+                setFormState((prev) => ({
+                  ...prev,
+                  startDate: event.target.value,
+                }))
+              }
               required
             />
           </label>
@@ -172,7 +227,12 @@ export default function AdminEventsPanel({ events, onRefresh, onMessage }) {
               type="datetime-local"
               className="w-full rounded-xl border border-slate-300 px-3 py-2"
               value={formState.endDate}
-              onChange={(event) => setFormState((prev) => ({ ...prev, endDate: event.target.value }))}
+              onChange={(event) =>
+                setFormState((prev) => ({
+                  ...prev,
+                  endDate: event.target.value,
+                }))
+              }
               required
             />
           </label>
@@ -186,7 +246,10 @@ export default function AdminEventsPanel({ events, onRefresh, onMessage }) {
               placeholder="Example: 150"
               value={formState.capacity}
               onChange={(event) =>
-                setFormState((prev) => ({ ...prev, capacity: event.target.value.replace(/[^0-9]/g, "") }))
+                setFormState((prev) => ({
+                  ...prev,
+                  capacity: event.target.value.replace(/[^0-9]/g, ""),
+                }))
               }
               required
             />
@@ -207,7 +270,9 @@ export default function AdminEventsPanel({ events, onRefresh, onMessage }) {
                 }))
               }
             />
-            <p className="text-xs text-slate-500">Users will see and pay this amount in rupees.</p>
+            <p className="text-xs text-slate-500">
+              Users will see and pay this amount in rupees.
+            </p>
           </label>
           <div className="md:col-span-2">
             <button
@@ -229,17 +294,28 @@ export default function AdminEventsPanel({ events, onRefresh, onMessage }) {
               <p className="text-sm text-slate-600">No events available.</p>
             ) : (
               events.map((eventItem) => (
-                <div key={String(eventItem._id)} className="rounded-xl border border-slate-200 p-3">
-                  <p className="font-medium text-slate-900">{eventItem.title}</p>
+                <div
+                  key={String(eventItem._id)}
+                  className="rounded-xl border border-slate-200 p-3"
+                >
+                  <p className="font-medium text-slate-900">
+                    {eventItem.title}
+                  </p>
                   <p className="text-sm text-slate-600">
-                    {formatMoney(eventItem.priceInCents, eventItem.currency)} | {eventItem.status}
+                    Category: {eventItem.category || "General"}
+                  </p>
+                  <p className="text-sm text-slate-600">
+                    {formatMoney(eventItem.priceInCents, eventItem.currency)} |{" "}
+                    {eventItem.status}
                   </p>
                   <p className="text-sm text-slate-600">
                     Seats booked: {eventItem.seatsBooked}/{eventItem.capacity}
                   </p>
                   <div className="mt-3 flex gap-2">
                     <button
-                      onClick={() => handleLoadRegistrations(String(eventItem._id))}
+                      onClick={() =>
+                        handleLoadRegistrations(String(eventItem._id))
+                      }
                       className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
                     >
                       View Users
@@ -250,7 +326,9 @@ export default function AdminEventsPanel({ events, onRefresh, onMessage }) {
                         disabled={isDeletingId === String(eventItem._id)}
                         className="rounded-lg border border-rose-300 px-3 py-1.5 text-sm text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed"
                       >
-                        {isDeletingId === String(eventItem._id) ? "Deleting..." : "Delete"}
+                        {isDeletingId === String(eventItem._id)
+                          ? "Deleting..."
+                          : "Delete"}
                       </button>
                     )}
                   </div>
@@ -261,19 +339,30 @@ export default function AdminEventsPanel({ events, onRefresh, onMessage }) {
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h3 className="text-lg font-semibold text-slate-900">Registered User IDs</h3>
+          <h3 className="text-lg font-semibold text-slate-900">
+            Registered User IDs
+          </h3>
           <p className="mt-1 text-sm text-slate-600">
-            {selectedEventId ? `Event: ${selectedEventId}` : "Select an event to inspect."}
+            {selectedEventId
+              ? `Event: ${selectedEventId}`
+              : "Select an event to inspect."}
           </p>
           <div className="mt-4 space-y-2">
             {registrationUsers.length === 0 ? (
-              <p className="text-sm text-slate-600">No registered users loaded.</p>
+              <p className="text-sm text-slate-600">
+                No registered users loaded.
+              </p>
             ) : (
               registrationUsers.map((user) => (
-                <div key={String(user.userId)} className="rounded-xl border border-slate-200 p-3 text-sm">
+                <div
+                  key={String(user.userId)}
+                  className="rounded-xl border border-slate-200 p-3 text-sm"
+                >
                   <p className="font-medium text-slate-900">{user.username}</p>
                   <p className="text-slate-700">{user.email}</p>
-                  <p className="text-slate-600">User ID: {String(user.userId)}</p>
+                  <p className="text-slate-600">
+                    User ID: {String(user.userId)}
+                  </p>
                 </div>
               ))
             )}

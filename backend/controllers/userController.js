@@ -23,7 +23,9 @@ export const register = async (req, res) => {
   const { username, email, password } = req.body;
 
   if (!username || !email || !password) {
-    return res.status(400).json({ message: "username, email and password are required." });
+    return res
+      .status(400)
+      .json({ message: "username, email and password are required." });
   }
 
   if (!isValidEmail(email)) {
@@ -31,7 +33,9 @@ export const register = async (req, res) => {
   }
 
   if (String(password).length < 8) {
-    return res.status(400).json({ message: "Password must be at least 8 characters long." });
+    return res
+      .status(400)
+      .json({ message: "Password must be at least 8 characters long." });
   }
 
   try {
@@ -57,7 +61,7 @@ export const register = async (req, res) => {
     const token = jwt.sign(
       { userId: newUser._id, role: newUser.role, email: newUser.email },
       JWT_SECRET_KEY,
-      { expiresIn: "7d" }
+      { expiresIn: "7d" },
     );
 
     setAuthCookie(res, token);
@@ -85,12 +89,16 @@ export const login = async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return res.status(400).json({ message: "email and password are required." });
+    return res
+      .status(400)
+      .json({ message: "email and password are required." });
   }
 
   try {
     // Find user by email
-    const user = await User.findOne({ email: String(email).trim().toLowerCase() }).select("+password username email role");
+    const user = await User.findOne({
+      email: String(email).trim().toLowerCase(),
+    }).select("+password username email role");
     if (!user) {
       return res
         .status(404)
@@ -105,7 +113,7 @@ export const login = async (req, res) => {
     const token = jwt.sign(
       { userId: user._id, role: user.role, email: user.email },
       JWT_SECRET_KEY,
-      { expiresIn: "7d" }
+      { expiresIn: "7d" },
     );
 
     setAuthCookie(res, token);
@@ -150,5 +158,58 @@ export const checkAuth = (req, res) => {
   } catch (error) {
     console.log("Error checking Auth : ", error);
     res.status(500).json({ message: "Error checking auth." });
+  }
+};
+
+export const ensureTestAdmin = async (_req, res) => {
+  if (process.env.NODE_ENV === "production") {
+    return res.status(403).json({ message: "Not available in production." });
+  }
+
+  const email = String(process.env.TEST_ADMIN_EMAIL || "admin@eventreg.com")
+    .trim()
+    .toLowerCase();
+  const password = String(process.env.TEST_ADMIN_PASSWORD || "admin12345");
+  const username = String(
+    process.env.TEST_ADMIN_USERNAME || "Test Admin",
+  ).trim();
+
+  if (password.length < 8) {
+    return res
+      .status(400)
+      .json({ message: "TEST_ADMIN_PASSWORD must be at least 8 characters." });
+  }
+
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    let user = await User.findOne({ email }).select(
+      "+password username email role",
+    );
+
+    if (!user) {
+      user = await User.create({
+        username,
+        email,
+        password: hashedPassword,
+        role: "admin",
+      });
+    } else {
+      user.username = username || user.username;
+      user.password = hashedPassword;
+      user.role = "admin";
+      await user.save();
+    }
+
+    return res.status(200).json({
+      message: "Test admin is ready.",
+      testAdmin: {
+        email,
+      },
+    });
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ message: "Failed to prepare test admin.", error: error.message });
   }
 };

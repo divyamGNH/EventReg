@@ -4,21 +4,40 @@ import EventRegistration from "../models/EventRegistration.js";
 import AdminActionLog from "../models/AdminActionLog.js";
 
 export const createEvent = async (req, res) => {
-  const { title, description, location, startDate, endDate, capacity, priceInCents, currency } = req.body;
+  const {
+    title,
+    description,
+    location,
+    category,
+    imageUrl,
+    startDate,
+    endDate,
+    capacity,
+    priceInCents,
+    currency,
+  } = req.body;
 
   if (!title || !startDate || !endDate || !capacity) {
-    return res.status(400).json({ message: "title, startDate, endDate and capacity are required." });
+    return res
+      .status(400)
+      .json({
+        message: "title, startDate, endDate and capacity are required.",
+      });
   }
 
   if (new Date(startDate) >= new Date(endDate)) {
-    return res.status(400).json({ message: "endDate must be after startDate." });
+    return res
+      .status(400)
+      .json({ message: "endDate must be after startDate." });
   }
 
   try {
     const eventItem = await Event.create({
-      title,
-      description: description || "",
-      location: location || "Online",
+      title: String(title).trim(),
+      description: String(description || "").trim(),
+      location: String(location || "Online").trim(),
+      category: String(category || "General").trim(),
+      imageUrl: String(imageUrl || "").trim(),
       startDate,
       endDate,
       capacity,
@@ -40,7 +59,9 @@ export const createEvent = async (req, res) => {
 
     return res.status(201).json({ event: eventItem });
   } catch (error) {
-    return res.status(500).json({ message: "Failed to create event.", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Failed to create event.", error: error.message });
   }
 };
 
@@ -73,7 +94,9 @@ export const deleteEvent = async (req, res) => {
 
     return res.status(200).json({ message: "Event deleted successfully." });
   } catch (error) {
-    return res.status(500).json({ message: "Failed to delete event.", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Failed to delete event.", error: error.message });
   }
 };
 
@@ -82,7 +105,9 @@ export const listAllEvents = async (_req, res) => {
     const events = await Event.find({}).sort({ createdAt: -1 }).lean();
     return res.status(200).json({ events });
   } catch (error) {
-    return res.status(500).json({ message: "Failed to fetch events.", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Failed to fetch events.", error: error.message });
   }
 };
 
@@ -94,7 +119,10 @@ export const listEventRegistrations = async (req, res) => {
   }
 
   try {
-    const registrations = await EventRegistration.find({ eventId, status: "registered" })
+    const registrations = await EventRegistration.find({
+      eventId,
+      status: "registered",
+    })
       .select("userId paidAt createdAt")
       .populate({ path: "userId", select: "username email role" })
       .lean();
@@ -120,6 +148,11 @@ export const listEventRegistrations = async (req, res) => {
 
     return res.status(200).json({ users: userIds });
   } catch (error) {
-    return res.status(500).json({ message: "Failed to fetch registrations.", error: error.message });
+    return res
+      .status(500)
+      .json({
+        message: "Failed to fetch registrations.",
+        error: error.message,
+      });
   }
 };

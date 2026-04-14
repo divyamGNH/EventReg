@@ -41,8 +41,6 @@ const paymentSchema = new mongoose.Schema(
     },
     stripeCheckoutSessionId: {
       type: String,
-      index: true,
-      sparse: true,
     },
     stripePaymentIntentId: {
       type: String,
@@ -57,9 +55,12 @@ const paymentSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
-paymentSchema.index({ stripeCheckoutSessionId: 1 }, { unique: true, sparse: true });
+paymentSchema.index(
+  { stripeCheckoutSessionId: 1 },
+  { unique: true, sparse: true },
+);
 
 export default mongoose.model("Payment", paymentSchema);

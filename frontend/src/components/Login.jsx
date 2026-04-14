@@ -2,11 +2,19 @@ import { useState } from "react";
 import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+const TEST_ADMIN_EMAIL =
+  import.meta.env.VITE_TEST_ADMIN_EMAIL || "admin@eventreg.com";
+const TEST_ADMIN_PASSWORD =
+  import.meta.env.VITE_TEST_ADMIN_PASSWORD || "admin12345";
+
 function Login({ setAuthUser }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [authMode, setAuthMode] = useState("admin");
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPreparingTestAdmin, setIsPreparingTestAdmin] = useState(false);
 
   const navigate = useNavigate();
 
@@ -17,12 +25,11 @@ function Login({ setAuthUser }) {
 
     try {
       const response = await axios.post(
-        "http://localhost:3000/api/auth/login",
+        `${API_BASE}/api/auth/login`,
         { email, password },
-        { withCredentials: true }
+        { withCredentials: true },
       );
 
-      console.log(response.data);
       const loggedInUser = response.data?.user;
       setAuthUser(loggedInUser);
       navigate("/home");
@@ -37,75 +44,151 @@ function Login({ setAuthUser }) {
     }
   };
 
+  const useTestCredentials = async () => {
+    setAuthMode("admin");
+    setErrorMessage("");
+    setIsPreparingTestAdmin(true);
+
+    try {
+      await axios.post(
+        `${API_BASE}/api/auth/test-admin/ensure`,
+        {},
+        { withCredentials: true },
+      );
+      setEmail(TEST_ADMIN_EMAIL);
+      setPassword(TEST_ADMIN_PASSWORD);
+    } catch (error) {
+      setEmail(TEST_ADMIN_EMAIL);
+      setPassword(TEST_ADMIN_PASSWORD);
+      setErrorMessage(
+        error.response?.data?.message ||
+          "Unable to prepare test admin automatically. Try manual admin credentials.",
+      );
+    } finally {
+      setIsPreparingTestAdmin(false);
+    }
+  };
+
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-100 px-4 py-8 sm:px-6">
-      <div className="pointer-events-none absolute -left-20 -top-20 h-72 w-72 rounded-full bg-cyan-300/30 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-24 -right-16 h-72 w-72 rounded-full bg-blue-200/50 blur-3xl" />
+    <div className="min-h-screen bg-[#efeff1] px-4 py-8 sm:px-6">
+      <div className="mx-auto w-full max-w-4xl">
+        <Link
+          to="/"
+          className="inline-flex items-center text-3xl font-semibold text-slate-800 transition hover:text-black"
+        >
+          <span className="mr-2">&larr;</span> EventReg
+        </Link>
 
-      <div className="relative w-full max-w-md rounded-3xl border border-slate-200/80 bg-white/95 p-7 shadow-[0_20px_55px_-25px_rgba(15,23,42,0.35)] backdrop-blur-sm sm:p-8">
-        <p className="mb-2 text-sm font-medium uppercase tracking-[0.22em] text-slate-500">
-          Welcome back
-        </p>
-        <h2 className="mb-1 text-3xl font-semibold text-slate-900">Sign in</h2>
-        <p className="mb-6 text-sm text-slate-600">
-          Access your account to continue your golf journey.
-        </p>
+        <div className="mt-8 rounded-2xl border border-slate-300 bg-white p-6 shadow-sm sm:p-8">
+          <h1 className="text-center text-4xl font-extrabold text-slate-900">
+            Admin Authentication Page
+          </h1>
 
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div className="space-y-1.5">
-            <label htmlFor="email" className="block text-sm font-medium text-slate-700">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
-              required
-            />
+          <div className="mt-6 grid overflow-hidden rounded-xl border border-dashed border-[#f05456] sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => setAuthMode("admin")}
+              className={`px-6 py-4 text-left transition ${
+                authMode === "admin"
+                  ? "bg-[#f05456] text-white"
+                  : "bg-white text-slate-800"
+              }`}
+            >
+              <p className="text-sm">01</p>
+              <p className="text-2xl font-semibold">Verify Credentials</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => setAuthMode("user")}
+              className={`px-6 py-4 text-left transition ${
+                authMode === "user"
+                  ? "bg-[#f05456] text-white"
+                  : "bg-white text-slate-800"
+              }`}
+            >
+              <p className="text-sm">02</p>
+              <p className="text-2xl font-semibold">Go to Dashboard!</p>
+            </button>
           </div>
 
-          <div className="space-y-1.5">
-            <label htmlFor="password" className="block text-sm font-medium text-slate-700">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              placeholder="Enter your password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
-              required
-            />
-          </div>
+          <form onSubmit={handleLogin} className="mt-6 space-y-5">
+            <div>
+              <label htmlFor="email" className="block text-2xl text-slate-700">
+                Enter your Registered Email address
+              </label>
+              <input
+                id="email"
+                type="email"
+                placeholder={
+                  authMode === "admin"
+                    ? "admin@eventreg.com"
+                    : "you@example.com"
+                }
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="mt-2 w-full rounded-lg border border-slate-200 bg-slate-100 px-4 py-3 text-xl text-slate-900 outline-none transition focus:border-[#f05456] focus:bg-white"
+                required
+              />
+            </div>
 
-          {errorMessage && (
-            <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-              {errorMessage}
+            <div>
+              <label
+                htmlFor="password"
+                className="block text-2xl text-slate-700"
+              >
+                Enter your Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="mt-2 w-full rounded-lg border border-slate-200 bg-slate-100 px-4 py-3 text-xl text-slate-900 outline-none transition focus:border-[#f05456] focus:bg-white"
+                required
+              />
+            </div>
+
+            {errorMessage && (
+              <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-lg text-rose-700">
+                {errorMessage}
+              </p>
+            )}
+
+            <p className="text-lg text-slate-600">
+              You can designate yourself as an admin for testing by using test
+              credentials.
             </p>
-          )}
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full rounded-xl bg-slate-900 py-2.5 font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
-          >
-            {isSubmitting ? "Signing in..." : "Sign in"}
-          </button>
-        </form>
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="rounded-md bg-[#f05456] px-8 py-3 text-xl font-semibold text-white transition hover:bg-[#df4a4c] disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {isSubmitting ? "Verifying..." : "Verify"}
+              </button>
+              <button
+                type="button"
+                onClick={useTestCredentials}
+                disabled={isPreparingTestAdmin}
+                className="rounded-md bg-[#3f4b61] px-8 py-3 text-xl font-semibold text-white transition hover:bg-[#313b4d]"
+              >
+                {isPreparingTestAdmin ? "Preparing..." : "Use Test Credentials"}
+              </button>
+            </div>
+          </form>
 
-        <p className="mt-5 text-center text-sm text-slate-600">
-          Don&apos;t have an account?{" "}
-          <Link
-            to="/register"
-            className="font-medium text-cyan-700 transition hover:text-cyan-800 hover:underline"
-          >
-            Create one
-          </Link>
-        </p>
+          <p className="mt-6 text-lg text-slate-600">
+            Don&apos;t have an account?{" "}
+            <Link
+              to="/register"
+              className="font-semibold text-[#f05456] hover:underline"
+            >
+              Create one
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

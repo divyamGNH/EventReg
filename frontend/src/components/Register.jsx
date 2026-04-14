@@ -2,6 +2,8 @@ import { useState } from "react";
 import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+
 function Register({ setAuthUser }) {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -18,18 +20,19 @@ function Register({ setAuthUser }) {
 
     try {
       const response = await axios.post(
-        "http://localhost:3000/api/auth/register",
+        `${API_BASE}/api/auth/register`,
         { username, email, password },
-        { withCredentials: true }
+        { withCredentials: true },
       );
 
-      console.log(response.data);
       setAuthUser(response.data?.user || null);
       navigate("/home");
     } catch (error) {
       const message =
         error.response?.data?.message ||
-        "Unable to create account right now. Please try again.";
+        (error.request
+          ? "Unable to reach server. Check backend is running and CORS/API URL settings."
+          : "Unable to create account right now. Please try again.");
       setErrorMessage(message);
       console.error(error.response?.data || error.message);
     } finally {
@@ -38,86 +41,102 @@ function Register({ setAuthUser }) {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-100 px-4 py-8 sm:px-6">
-      <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-emerald-300/30 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-24 -left-16 h-72 w-72 rounded-full bg-cyan-200/50 blur-3xl" />
+    <div className="min-h-screen bg-[#efeff1] px-4 py-8 sm:px-6">
+      <div className="mx-auto w-full max-w-4xl">
+        <Link
+          to="/"
+          className="inline-flex items-center text-3xl font-semibold text-slate-800 transition hover:text-black"
+        >
+          <span className="mr-2">&larr;</span> EventReg
+        </Link>
 
-      <div className="relative w-full max-w-md rounded-3xl border border-slate-200/80 bg-white/95 p-7 shadow-[0_20px_55px_-25px_rgba(15,23,42,0.35)] backdrop-blur-sm sm:p-8">
-        <p className="mb-2 text-sm font-medium uppercase tracking-[0.22em] text-slate-500">
-          Let&apos;s get started
-        </p>
-        <h2 className="mb-1 text-3xl font-semibold text-slate-900">Create account</h2>
-        <p className="mb-6 text-sm text-slate-600">
-          Join in and start tracking your game in a calm, focused space.
-        </p>
+        <div className="mt-8 rounded-2xl border border-slate-300 bg-white p-6 shadow-sm sm:p-8">
+          <h1 className="text-center text-4xl font-extrabold text-slate-900">
+            Create Your Account
+          </h1>
+          <p className="mt-2 text-center text-xl text-slate-600">
+            Join EventReg and start managing registrations with a cleaner
+            workflow.
+          </p>
 
-        <form onSubmit={handleRegister} className="space-y-4">
-          <div className="space-y-1.5">
-            <label htmlFor="username" className="block text-sm font-medium text-slate-700">
-              Username
-            </label>
-            <input
-              id="username"
-              type="text"
-              placeholder="Your name"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-              required
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label htmlFor="email" className="block text-sm font-medium text-slate-700">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-              required
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label htmlFor="password" className="block text-sm font-medium text-slate-700">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              placeholder="Create a secure password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-              required
-            />
-          </div>
-
-          {errorMessage && (
-            <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-              {errorMessage}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full rounded-xl bg-slate-900 py-2.5 font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+          <form
+            onSubmit={handleRegister}
+            className="mx-auto mt-8 grid max-w-3xl gap-5"
           >
-            {isSubmitting ? "Creating account..." : "Create account"}
-          </button>
-        </form>
+            <div>
+              <label
+                htmlFor="username"
+                className="block text-2xl text-slate-700"
+              >
+                Username
+              </label>
+              <input
+                id="username"
+                type="text"
+                placeholder="Your name"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="mt-2 w-full rounded-lg border border-slate-200 bg-slate-100 px-4 py-3 text-xl text-slate-900 outline-none transition focus:border-[#f05456] focus:bg-white"
+                required
+              />
+            </div>
 
-        <p className="mt-5 text-center text-sm text-slate-600">
-          Already have an account?{" "}
-          <Link to="/login" className="font-medium text-emerald-700 transition hover:text-emerald-800 hover:underline">
-            Sign in
-          </Link>
-        </p>
+            <div>
+              <label htmlFor="email" className="block text-2xl text-slate-700">
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="mt-2 w-full rounded-lg border border-slate-200 bg-slate-100 px-4 py-3 text-xl text-slate-900 outline-none transition focus:border-[#f05456] focus:bg-white"
+                required
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="password"
+                className="block text-2xl text-slate-700"
+              >
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                placeholder="At least 8 characters"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="mt-2 w-full rounded-lg border border-slate-200 bg-slate-100 px-4 py-3 text-xl text-slate-900 outline-none transition focus:border-[#f05456] focus:bg-white"
+                required
+              />
+            </div>
+
+            {errorMessage && (
+              <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-lg text-rose-700">
+                {errorMessage}
+              </p>
+            )}
+
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="rounded-md bg-[#f05456] px-8 py-3 text-xl font-semibold text-white transition hover:bg-[#df4a4c] disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {isSubmitting ? "Creating..." : "Create Account"}
+              </button>
+              <Link
+                to="/login"
+                className="rounded-md bg-[#3f4b61] px-8 py-3 text-xl font-semibold text-white transition hover:bg-[#313b4d]"
+              >
+                I Have an Account
+              </Link>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );

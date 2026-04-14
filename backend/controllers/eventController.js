@@ -6,7 +6,9 @@ import Payment from "../models/Payment.js";
 export const listActiveEvents = async (req, res) => {
   try {
     const events = await Event.find({ status: "active" })
-      .select("title description location startDate endDate capacity seatsBooked priceInCents currency")
+      .select(
+        "title description location category imageUrl startDate endDate capacity seatsBooked priceInCents currency",
+      )
       .sort({ startDate: 1 })
       .lean();
 
@@ -18,32 +20,41 @@ export const listActiveEvents = async (req, res) => {
       .lean();
 
     const registrationMap = new Map(
-      userRegistrations.map((registration) => [String(registration.eventId), registration.status])
+      userRegistrations.map((registration) => [
+        String(registration.eventId),
+        registration.status,
+      ]),
     );
 
     const data = events.map((eventItem) => ({
       ...eventItem,
       availableSeats: Math.max(eventItem.capacity - eventItem.seatsBooked, 0),
       isRegistered: registrationMap.get(String(eventItem._id)) === "registered",
-      registrationStatus: registrationMap.get(String(eventItem._id)) || "not_registered",
+      registrationStatus:
+        registrationMap.get(String(eventItem._id)) || "not_registered",
     }));
 
     return res.status(200).json({ events: data });
   } catch (error) {
-    return res.status(500).json({ message: "Failed to fetch events.", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Failed to fetch events.", error: error.message });
   }
 };
 
 export const listMyRegistrations = async (req, res) => {
   try {
-    const registrations = await EventRegistration.find({ userId: req.user.userId })
+    const registrations = await EventRegistration.find({
+      userId: req.user.userId,
+    })
       .populate({
         path: "eventId",
         select: "title location startDate endDate priceInCents currency status",
       })
       .populate({
         path: "paymentId",
-        select: "status amountInCents currency stripeCheckoutSessionId stripePaymentIntentId updatedAt",
+        select:
+          "status amountInCents currency stripeCheckoutSessionId stripePaymentIntentId updatedAt",
       })
       .sort({ createdAt: -1 })
       .lean();
@@ -60,7 +71,12 @@ export const listMyRegistrations = async (req, res) => {
 
     return res.status(200).json({ registrations: data });
   } catch (error) {
-    return res.status(500).json({ message: "Failed to fetch registrations.", error: error.message });
+    return res
+      .status(500)
+      .json({
+        message: "Failed to fetch registrations.",
+        error: error.message,
+      });
   }
 };
 
@@ -72,13 +88,19 @@ export const getEventById = async (req, res) => {
   }
 
   try {
-    const eventItem = await Event.findOne({ _id: eventId, status: "active" }).lean();
+    const eventItem = await Event.findOne({
+      _id: eventId,
+      status: "active",
+    }).lean();
 
     if (!eventItem) {
       return res.status(404).json({ message: "Event not found." });
     }
 
-    const registration = await EventRegistration.findOne({ userId: req.user.userId, eventId }).lean();
+    const registration = await EventRegistration.findOne({
+      userId: req.user.userId,
+      eventId,
+    }).lean();
 
     return res.status(200).json({
       event: {
@@ -88,20 +110,26 @@ export const getEventById = async (req, res) => {
       registrationStatus: registration?.status || "not_registered",
     });
   } catch (error) {
-    return res.status(500).json({ message: "Failed to fetch event.", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Failed to fetch event.", error: error.message });
   }
 };
 
 export const listMyPayments = async (req, res) => {
   try {
     const payments = await Payment.find({ userId: req.user.userId })
-      .select("eventId status amountInCents currency stripeCheckoutSessionId stripePaymentIntentId createdAt updatedAt")
+      .select(
+        "eventId status amountInCents currency stripeCheckoutSessionId stripePaymentIntentId createdAt updatedAt",
+      )
       .populate({ path: "eventId", select: "title startDate" })
       .sort({ createdAt: -1 })
       .lean();
 
     return res.status(200).json({ payments });
   } catch (error) {
-    return res.status(500).json({ message: "Failed to fetch payments.", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Failed to fetch payments.", error: error.message });
   }
 };
